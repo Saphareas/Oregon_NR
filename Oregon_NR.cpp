@@ -15,9 +15,10 @@
 // Receive only:
 // THN132N,
 // WGR800,
-// UVN800.
+// UVN800,
+// PCR800.
 //
-// Aslo supported self-developed sensors. Please contact author for additional infromation.
+// Also supported self-developed sensors. Please contact author for additional information.
 //
 // This file is part of the Arduino OREGON_NR library.
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -53,7 +54,7 @@
 // Тольок приём:
 // THN132N,
 // WGR800,
-// UVN800.
+// PCR800.
 //
 // Также поддерживаются датчики собственной разработки (за дополнительной документацей обращаться к автору)
 //
@@ -1620,6 +1621,36 @@ byte Oregon_NR::get_light(byte *oregon_data)
     return 0;
 }
 
+float Oregon_NR::get_total_rain(byte* oregon_data)
+{
+  if (sens_type == PCR800 && crc_c){
+    float tmprt;
+    tmprt = *(oregon_data + 17) * 100000;
+    tmprt += *(oregon_data + 16) * 10000;
+    tmprt += *(oregon_data + 15) * 1000;
+    tmprt += *(oregon_data + 14) * 100;
+    tmprt += *(oregon_data + 13) * 10;
+    tmprt += *(oregon_data + 12);
+    tmprt *= 25;
+    return tmprt / 1000;
+  }
+  else return 0;
+}
+
+float Oregon_NR::get_rain_rate(byte* oregon_data)
+{
+  if (sens_type == PCR800 && crc_c){
+    float tmprt; 
+    tmprt = *(oregon_data + 7) * 10000;
+    tmprt += *(oregon_data + 8) * 1000;
+    tmprt += *(oregon_data + 9) * 100;
+    tmprt += *(oregon_data + 10) * 10;
+    tmprt += *(oregon_data + 11);
+    tmprt *= 25;
+    return tmprt / 1000;
+  }
+  else return 0;
+}
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //Проверка CRC
 //oregon_data - указатель на кодовую посылку
@@ -1772,6 +1803,19 @@ bool Oregon_NR::check_CRC(byte *oregon_data, word sens_type)
     return (resived_crc == crc) ? 1 : 0;
   }
 
+  if (sens_type == PCR800){
+   //CHKSUM 1...17
+    for(int x=0; x < 18; x++){
+      crc += *pp;
+      pp++;
+    }
+
+    resived_crc = (*(oregon_data+18))+(*(oregon_data+19))*0x10;
+    return (resived_crc == crc)? 1 : 0;
+  }
+
+ //CHKSUM 1...12 
+ //CRC 1...5,8...12 STARTSUM = D6h, POLY = 07h
   if (sens_type == THN132)
   {
     //CHKSUM 1...12
@@ -1804,7 +1848,6 @@ bool Oregon_NR::check_CRC(byte *oregon_data, word sens_type)
   }
 
 #ifdef ADD_SENS_SUPPORT == 1
-
   if ((sens_type & 0xFF00) == GAS || (sens_type & 0xFF00) == THP || (sens_type & 0xFF00) == FIRE || (sens_type & 0xFF00) == CURRENT || (sens_type & 0xFF00) == CAPRAIN)
   {
     truecrc = 0x00;

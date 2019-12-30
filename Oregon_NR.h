@@ -17,9 +17,10 @@
 // Receive only:
 // THN132N,
 // WGR800,
-// UVN800.
+// UVN800,
+// PCR800.
 //
-// Aslo supported self-developed sensors. Please contact author for additional infromation.
+// Also supported self-developed sensors. Please contact author for additional information.
 //
 // This file is part of the Arduino OREGON_NR library.
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -55,7 +56,8 @@
 // Тольок приём:
 // THN132N,
 // WGR800,
-// UVN800.
+// UVN800,
+// PCR800.
 //
 // Также поддерживаются датчики собственной разработки (за дополнительной документацей обращаться к автору)
 //
@@ -76,7 +78,6 @@
 // НЕ НЕСУТ ОТВЕТСТВЕННОСТИ ПО КАКИМ-ЛИБО ИСКАМ, ЗА УЩЕРБ ИЛИ ПО ИНЫМ ТРЕБОВАНИЯМ, В ТОМ ЧИСЛЕ, ПРИ ДЕЙСТВИИ КОНТРАКТА, ДЕЛИКТЕ ИЛИ ИНОЙ СИТУАЦИИ,
 // ВОЗНИКШИМ ИЗ-ЗА ИСПОЛЬЗОВАНИЯ ПРОГРАММНОГО ОБЕСПЕЧЕНИЯ ИЛИ ИНЫХ ДЕЙСТВИЙ С ПРОГРАММНЫМ ОБЕСПЕЧЕНИЕМ.
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//
 
 // Распознавание пакетов от следующих датчиков Oregon Scientific:
 //
@@ -86,6 +87,7 @@
 #define THGR810 0xF824 // Температура, влажность, 10 каналов,
 #define WGR800 0x1984  // Направление и скорость ветра
 #define UVN800 0xD874  // УФ-индекс, освещённость (спасибо XOR за предоставленные данные)
+#define PCR800    0x2914 // Rain gauge
 //
 // Датчики собственной разработки:
 #define THP 0x5500     // Температура, влажность, атм давление, 8 каналов, работа от 3-ех батарей АА,
@@ -128,156 +130,160 @@ static int RECEIVER_PIN;
 
 class Oregon_NR
 {
-public:
-  //Данные датчика
-  word sens_type; //Sensor type
+  public:
+    //Данные датчика
+    word sens_type; //Sensor type
 
-  float sens_tmp, //Temperature
-      sens_hmdty; //Humidity
+    float sens_tmp,   //Temperature
+          sens_hmdty; //Humidity
 
-  byte sens_chnl,   //Channel number
-      sens_id,      //ID
-      sens_battery; //Battery status
+    byte sens_chnl,    //Channel number
+         sens_id,      //ID
+         sens_battery; //Battery status
 
-  byte ver = 0; //Protocol version
+    byte ver = 0; //Protocol version
 
-  bool crc_c = 0;    //CRC check result. Сбрасывается при захвате. Выставляется при приёме корректного пакета.
-  bool captured = 0; //Capture data flag. Выставляется, если были считаны данные в память.
+    bool crc_c = 0;    //CRC check result. Сбрасывается при захвате. Выставляется при приёме корректного пакета.
+    bool captured = 0; //Capture data flag. Выставляется, если были считаны данные в память.
 
-  unsigned long work_time;     //Capture time
-  byte packet[PACKET_LENGTH];  //Result packet
-  byte valid_p[PACKET_LENGTH]; //Validity mask - маска уверенного распознавания битов
-  byte packets_received = 0;   //Number of received packets in block (0...2)
-  byte received_CRC;           //Calculated СRC
+    unsigned long work_time;     //Capture time
+    byte packet[PACKET_LENGTH];  //Result packet
+    byte valid_p[PACKET_LENGTH]; //Validity mask - маска уверенного распознавания битов
+    byte packets_received = 0;   //Number of received packets in block (0...2)
+    byte received_CRC;           //Calculated СRC
 
-  Oregon_NR(byte, byte);             //Конструктор. Параметры:
-  Oregon_NR(byte, byte, byte, bool); //(вывод приёмника, номер прерывания, вывод светодиода, pull up)
-  void start();                      //Star listening receiver
-  void stop();                       //Stop listening receiver. Чтобы не занимал процессор, когда не нужен
-  void capture(bool);                //Capture packet. if parameter is true function dumps capture data to Serial.
+    Oregon_NR(byte, byte);             //Конструктор. Параметры:
+    Oregon_NR(byte, byte, byte, bool); //(вывод приёмника, номер прерывания, вывод светодиода, pull up)
+    void start();                      //Star listening receiver
+    void stop();                       //Stop listening receiver. Чтобы не занимал процессор, когда не нужен
+    void capture(bool);                //Capture packet. if parameter is true function dumps capture data to Serial.
 
-  bool consist_synchro = false; //При поиске синхронибла опираться подтверждённые или сомнительные данные?
+    bool consist_synchro = false; //При поиске синхронибла опираться подтверждённые или сомнительные данные?
 
-  byte empty_space = 3; //Какое количество "пустых" тактов нужно для определения конца посылки?
-                        //Параметр определяется уровнем сигнала и скоростью АРУ приёмника.
-                        //Чем они лучше, тем меньше число. НО меньше двух не рекомендуется
-  //В сатрой версии было 5
-  bool catch2 = 1, catch3 = 1; //какие версии протокола принимать
-  int timing_correction = 0;
-    byte decode_method = 3;      // ����� ������������� ������
-                                 //1 - ������������
-                                 //3 - ��� �������� ������� 
+    byte empty_space = 3; //Какое количество "пустых" тактов нужно для определения конца посылки?
+                          //Параметр определяется уровнем сигнала и скоростью АРУ приёмника.
+                          //Чем они лучше, тем меньше число. НО меньше двух не рекомендуется
+    //В сатрой версии было 5
+    bool catch2 = 1, catch3 = 1; //какие версии протокола принимать
+    int timing_correction = 0; //Коррекция частоты приёма (от -10 до +10)
+    byte decode_method = 3; // Метод декодирования тактов
+                            //1 - традиционный
+                            //3 - при девиации частоты
 
-  //Ветрометр
-  float sens_avg_ws, sens_max_ws;
-  byte sens_wdir;
-  float get_avg_windspeed(byte *);
-  float get_max_windspeed(byte *);
-  byte get_winddirection(byte *);
-  //UV
-  byte UV_index, lightness;
-  byte get_UV(byte *);
-  byte get_light(byte *);
+    //Ветрометр
+    float sens_avg_ws, sens_max_ws;
+    byte  sens_wdir;
+    float get_avg_windspeed(byte*);
+    float get_max_windspeed(byte*);
+    byte get_winddirection(byte*);
+    //UV
+    byte UV_index, lightness;
+    byte get_UV(byte*);
+    byte get_light(byte*);
+    //Rain
+    float sens_total_rain, sens_rain_rate;
+    float get_total_rain(byte*);
+    float get_rain_rate(byte*);
 
-  byte restore_sign; //Битовое поле, инормирующее об успешных способах реставрации пакета
+    byte restore_sign; //Битовое поле, инормирующее об успешных способах реставрации пакета
 
-  //0 - восстановлены одиночные такты
-  //1 - восстановлены двойные такты
-  //2 - исправление версии протокола при разборке пакета
-  //3 - восстановлено методом сращивания (v2) - отключено для экономии ресурсов
+    //0 - восстановлены одиночные такты
+    //1 - восстановлены двойные такты
+    //2 - исправление версии протокола при разборке пакета
+    //3 - восстановлено методом сращивания (v2) - отключено для экономии ресурсов
 
-  bool receiver_dump = 0; //Сбрасывать ли дамп канала в Serial. работает тольок если capture(true)
-                          // фактически это осциллограмма огибающей сигнала с приёмника
-                          // Также выводятся тактовые последовательности до и после восстановления
+    bool receiver_dump = 0; //Сбрасывать ли дамп канала в Serial. работает тольок если capture(true)
+                            // фактически это осциллограмма огибающей сигнала с приёмника
+                            // Также выводятся тактовые последовательности до и после восстановления
+
+  #if ADD_SENS_SUPPORT == 1
+    float sens_pressure, //Pressure
+          sens_voltage,    // напряжение в В (for CURRENT и THP sensors)
+          sens_tmp2;       //Temperature2  (for GASv2 sensor)
+    byte sens_CO,        //CO (ppm*10) (for GASv2 sensor)
+         sens_CH;         //CH4 (ppm*100)(ppm)
+    byte sens_ip22,      //IP22 channel data (for FIRE sensor)
+         sens_ip72,       //IP72 channel data (for FIRE sensor)
+         sens_lockalarm;  //LOCK_ALARM channel data (for FIRE sensor)
+    float sens_current;  // ток в А (for CURRENT sensor)
+
+    word sens_pump_count;            // счётчик насоса
+    unsigned long sens_drop_counter; // счётчик капель (for CAPRAIN sensor)
+    int sens_capacitance;            //Емкость сенсора (for CAPRAIN sensor)
+  #endif
+
+  private:
+    byte read_tacts, read_tacts2, result_size;
+    byte LED = 0xFF;        //вывод светодиода, который мигает при приёме
+    bool PULL_UP;           //куда подключён светодиод
+    byte packet_number = 0; //Количесвто принятых пакетов в посылке
+    int INT_NO;             //Номер прерывания приёмника
+    //bool  reciever_ctrl = true; //Флаг контроля ресивера (выставляется при приходе импулься, сбрасывается в таймере)
+
+    //Массивы данных для записи данных с канала и полученных битов
+    byte decode_tacts[READ_BITS2]; //Массив тактов. значения
+    //                          0=ноль
+    //                          1=единица
+    //                          2=неизвестен
+    //                          3=переход+
+    //                          4=переход-
+
+    byte collect_data[READ_BITS2], //Память для сбора данных с приёмника
+  #if IS_ASSEMBLE
+        collect_data2[READ_BITS2];
+  #else
+        collect_data2[1];
+  #endif
+    //А когда становится массивом полученных битов, то значения такие:
+    //                          128 - неизвестен
+    //                          >128 - единица
+    //                          <128 - ноль
+
+    byte receive_status = FIND_PACKET;
+    byte start_pulse_cnt = 0;
+    unsigned long pulse_length, timer_marklong;
+    unsigned long pulse_marker, right_pulse_marker;
+    unsigned long pre_marker; // Для хранения временных меток преамбулы при захвате пакета
+    unsigned long first_packet_end;
+    byte data_val, data_val2;       // Качество пакетов
+    byte synchro_pos, synchro_pos2; // Позиции синхрониблов в записи
+    
+    byte get_gas_CH(byte* gas_data);
+    byte get_gas_CO(byte* gas_data);
+    byte get_gas_hmdty(byte* gas_data);
+    float get_gas_temperature_in(byte* gas_data);
+    float get_gas_temperature_out(byte* gas_data);
+    byte get_gas_channel(byte* gas_data);
+    void restore_data(byte* oregon_data, word sensor_type);
+    bool check_CRC(byte* oregon_data, word sensor_type);
+    byte get_id(byte* oregon_data);
+    float get_humidity(byte* oregon_data);
+    byte get_battery(byte* oregon_data);
+    byte get_channel(byte* oregon_data);
+    word get_sensor(byte* oregon_data);
+    float get_temperature(byte* oregon_data);
+    int get_info_data(byte* code, byte* result, byte* valid);
+    void assemble_data(byte* s1, byte* s2, int shift);
+    int correlate_data(byte* ser1, byte* ser2);
+    int collect(byte* cdptr);
+    int get_data(int btt, byte p_ver, byte* cdptr);
+    void get_tacts(byte*, byte);
+    int get_synchro_pos(byte* code);
+    void led_light(bool);
 
 #if ADD_SENS_SUPPORT == 1
-  float sens_pressure, //Pressure
-      sens_voltage,    // напряжение в В (for CURRENT и THP sensors)
-      sens_tmp2;       //Temperature2  (for GASv2 sensor)
-  byte sens_CO,        //CO (ppm*10) (for GASv2 sensor)
-      sens_CH;         //CH4 (ppm*100)(ppm)
-  byte sens_ip22,      //IP22 channel data (for FIRE sensor)
-      sens_ip72,       //IP72 channel data (for FIRE sensor)
-      sens_lockalarm;  //LOCK_ALARM channel data (for FIRE sensor)
-  float sens_current;  // ток в А (for CURRENT sensor)
-
-  word sens_pump_count;            // счётчик насоса
-  unsigned long sens_drop_counter; // счётчик капель (for CAPRAIN sensor)
-  int sens_capacitance;            //Емкость сенсора (for CAPRAIN sensor)
-#endif
-
-private:
-  byte read_tacts, read_tacts2, result_size;
-  byte LED = 0xFF;        //вывод светодиода, который мигает при приёме
-  bool PULL_UP;           //куда подключён светодиод
-  byte packet_number = 0; //Количесвто принятых пакетов в посылке
-  int INT_NO;             //Номер прерывания приёмника
-  //bool  reciever_ctrl = true; //Флаг контроля ресивера (выставляется при приходе импулься, сбрасывается в таймере)
-
-  //Массивы данных для записи данных с канала и полученных битов
-  byte decode_tacts[READ_BITS2]; //Массив тактов. значения
-  //                          0=ноль
-  //                          1=единица
-  //                          2=неизвестен
-  //                          3=переход+
-  //                          4=переход-
-
-  byte collect_data[READ_BITS2], //Память для сбора данных с приёмника
-#if IS_ASSEMBLE
-      collect_data2[READ_BITS2];
-#else
-      collect_data2[1];
-#endif
-  //А когда становится массивом полученных битов, то значения такие:
-  //                          128 - неизвестен
-  //                          >128 - единица
-  //                          <128 - ноль
-
-  byte receive_status = FIND_PACKET;
-  byte start_pulse_cnt = 0;
-  unsigned long pulse_length, timer_marklong;
-  unsigned long pulse_marker, right_pulse_marker;
-  unsigned long pre_marker; // Для хранения временных меток преамбулы при захвате пакета
-  unsigned long first_packet_end;
-  byte data_val, data_val2;       // Качество пакетов
-  byte synchro_pos, synchro_pos2; // Позиции синхрониблов в записи
-
-  byte get_gas_CH(byte *gas_data);
-  byte get_gas_CO(byte *gas_data);
-  byte get_gas_hmdty(byte *gas_data);
-  float get_gas_temperature_in(byte *gas_data);
-  float get_gas_temperature_out(byte *gas_data);
-  byte get_gas_channel(byte *gas_data);
-  void restore_data(byte *oregon_data, word sensor_type);
-  bool check_CRC(byte *oregon_data, word sensor_type);
-  byte get_id(byte *oregon_data);
-  float get_humidity(byte *oregon_data);
-  byte get_battery(byte *oregon_data);
-  byte get_channel(byte *oregon_data);
-  word get_sensor(byte *oregon_data);
-  float get_temperature(byte *oregon_data);
-  int get_info_data(byte *code, byte *result, byte *valid);
-  void assemble_data(byte *s1, byte *s2, int shift);
-  int correlate_data(byte *ser1, byte *ser2);
-  int collect(byte *cdptr);
-  int get_data(int btt, byte p_ver, byte *cdptr);
-  void get_tacts(byte *, byte);
-  int get_synchro_pos(byte *code);
-  void led_light(bool);
-
-#if ADD_SENS_SUPPORT == 1
-  byte get_fire_ip22(byte *fire_data);
-  byte get_fire_ip72(byte *fire_data);
-  byte get_fire_lockalarm(byte *fire_data);
-  float get_current(byte *curent_data);
-  float get_voltage(byte *voltage_data);
-  word get_pump_count(byte *voltage_data);
-  unsigned long get_dropcounter(byte *packetdata);
-  int get_capacitance(byte *packetdata);
-  float get_thp_humidity(byte *oregon_data);
-  float get_thp_temperature(byte *oregon_data);
-  float get_thp_pressure(byte *oregon_data);
-  float get_thp_voltage(byte *oregon_data);
+    byte get_fire_ip22(byte* fire_data);
+    byte get_fire_ip72(byte* fire_data);
+    byte get_fire_lockalarm(byte* fire_data);
+    float get_current(byte* curent_data);
+    float get_voltage(byte* voltage_data);
+    word  get_pump_count(byte* voltage_data);
+    unsigned long get_dropcounter(byte* packetdata);
+    int get_capacitance(byte* packetdata);
+    float get_thp_humidity(byte* oregon_data);
+    float get_thp_temperature(byte* oregon_data);
+    float get_thp_pressure(byte* oregon_data);
+    float get_thp_voltage(byte* oregon_data);
 #endif
 };
 

@@ -2,7 +2,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // This Arduino code is for receive and transmit data using Oregon Scientific RF protocol version 2.1 and 3.0. 
 //
-// Last updated: 14 �ctober 2019
+// Last updated: 14 October 2019
 //
 // The folowed sensors data format are supported.
 //
@@ -13,10 +13,10 @@
 
 // Receive only:
 // THN132N,
-// WGR800,	
+// WGR800,
 // UVN800.
 //
-// Aslo supported self-developed sensors. Please contact author for additional infromation.
+// Also supported self-developed sensors. Please contact author for additional information.
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //
 // Данная библиотека Ардуино предназначена для приема и передачи данных в формате беспроводного протокола Oregon Scientific v2.1 и v3.0
